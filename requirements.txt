@@ -4,4 +4,4 @@ sentencepiece
 mypy
 numpy
 safetensors
-llama-stack==0.2.12
+llama-stack
