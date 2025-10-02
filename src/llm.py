@@ -27,18 +27,22 @@ class Transformer(Generic[Embedding, Value]):
     unembed: Callable[[Embedding], Token]
 
 
-def attend_to(embeddings: List[Embedding],
-              score: Callable[[Embedding], float],
+def attend_to(inputs: List[Embedding],
+              score: Callable[[Embedding, Embedding], float],
               value: Callable[[Embedding], Value]) -> Value:
-    scores = [score(other) for other in embeddings]
-    scores = normalize(scores)
-    values = [value(other) for other in embeddings]
-    return weighted_average(scores, values)
+    result = 0
+    total_score = 0
+    last_input = inputs[-1]
+
+    for input in inputs:
+        result += score(last_input, input) * value(input)
+        total_score += score(last_input, input)
+    return result / total_score
 
 
 def decode(layer: Decoder[Embedding, Value], embeddings: List[Embedding]) -> Embedding:
     current = embeddings[-1]
-    focused = [attend_to(embeddings, partial(head.score, current), head.value)
+    focused = [attend_to(embeddings, head.score, head.value)
                for head in layer.heads]
     return layer.process(current, focused)
 
