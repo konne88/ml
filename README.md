@@ -11,12 +11,28 @@ Then run `llama download --source meta --model-id Llama-2-7b-chat`.
 To run the code, you need a machine with 64G of memory (no GPU required).
 If you don't have that, you can also open this repo in a github Codespace with 64G of memory.
 
-Now run `python src/example.py`
-
-And you should see something like this:
+Run
 
 ```
-Always answer with Ha iku . I am going to Paris , what should I see ?
+python src/example.py "[INST] What is 1+1? [/INST]"
+```
+
+and within a couple of minutes, you should see something like:
+
+```
+[ INST ] What is  1 + 1 ? [ / INST ]  The answer to  1 + 1 is  2 .
+```
+
+Or if you have a lot of time, you can try:
+
+```
+python src/example.py "[INST] Always answer with Haiku. I am going to Paris, what should I see? [/INST]"
+```
+
+And after many many hours, you should get something like:
+
+```
+ [ INST ] Always answer with Ha iku . I am going to Paris , what should I see ? [ / INST ]
 
 Tra vel er ' s delight
 R om ance in the city lights
