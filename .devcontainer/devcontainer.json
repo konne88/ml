@@ -1,0 +1,11 @@
+{
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "customizations": {
+        "vscode": {
+            "extensions": []
+        },
+        "settings": {
+        }
+    },
+    "postCreateCommand": "pip install -r /workspaces/*/requirements.txt"
+}
