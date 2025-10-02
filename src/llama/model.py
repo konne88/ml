@@ -39,7 +39,7 @@ class Embedding:
     data: Tensor
 
 
-def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_cis: Tensor) -> AttentionHead[Embedding, Tensor, Tensor, Tensor]:
+def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_cis: Tensor) -> AttentionHead[Embedding, Tensor]:
     def apply_rotary_emb(index: int, x: Tensor) -> Tensor:
         x = torch.view_as_complex(x.view(-1, 2))   # type:ignore
         return torch.view_as_real(x * freqs_cis[index]).flatten()
@@ -66,7 +66,7 @@ def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_ci
     )
 
 
-def llamaLayer(params: LlamaLayerParams, n_heads: int, head_dim: int, freqs_cis: Tensor) -> Decoder[Embedding, Tensor, Tensor, Tensor]:
+def llamaLayer(params: LlamaLayerParams, n_heads: int, head_dim: int, freqs_cis: Tensor) -> Decoder[Embedding, Tensor]:
     def process(current: Embedding, focused: List[Tensor]) -> Embedding:
         h = torch.stack(focused).flatten()
         h = current.data + params.output(h)
@@ -81,7 +81,7 @@ def llamaLayer(params: LlamaLayerParams, n_heads: int, head_dim: int, freqs_cis:
     )
 
 
-def llama(params: LlamaParams, max_seq_len: int, temperature: float = 0.7, top_p: float = 0.95) -> Transformer[Embedding, Tensor, Tensor, Tensor]:
+def llama(params: LlamaParams, max_seq_len: int, temperature: float = 0.7, top_p: float = 0.95) -> Transformer[Embedding, Tensor]:
     freqs_cis = precompute_freqs_cis(params.head_dim, max_seq_len * 2)
 
     def embed(index: int, token: Token) -> Embedding:

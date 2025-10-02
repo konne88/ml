@@ -15,3 +15,11 @@ def normalize(list: List[float]) -> List[float]:
 
 def weighted_average(weights: List[float], values):
     return sum([weight * value for weight, value in zip(weights, values)])
+
+
+A = TypeVar("A")
+
+
+def prefixes(seq: List[A]) -> Iterator[List[A]]:
+    for i in range(len(seq)):
+        yield seq[:i + 1]
