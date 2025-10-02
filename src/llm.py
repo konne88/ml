@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import partial
 from typing import Callable, Iterator, Generic, List, TypeVar
-from utils import normalize, prefixes, weighted_average
+from utils import prefixes
 
 Token = int
 Embedding = TypeVar('Embedding')

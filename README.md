@@ -1,4 +1,4 @@
-This repo provides the code for this [blog post](https://weitz.blog/p/attention-explained-to-ordinary-programmers).
+This repo provides the code for this [blog post](https://weitz.blog/p/attention-explained-to-ordinary-programmers). The code that defines the LLM architecture is in [src/lmm.py](src/llm.py), this includes the `attend_to` function.
 
 This repo has a .devcontainer directory, so opening it in VSCode should automatically
 install most dependencies you need. The only thing you have to download manually are the Llama2 weights, by following these [instructions](https://github.com/meta-llama/llama-models?tab=readme-ov-file#download); tldr:
