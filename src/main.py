@@ -1,10 +1,9 @@
-# from llmkv import autocomplete
 from llm import autocomplete
 from llama.model import llama
 from llama.tokenizer import Tokenizer
 from llama.params import llama7BParams
-import sys
 from kvcache import *
+import sys
 
 max_seq_len = 100
 
