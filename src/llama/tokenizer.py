@@ -14,7 +14,7 @@ logger = getLogger()
 class Tokenizer:
     """tokenizing and encoding/decoding text using SentencePiece."""
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str = "/home/vscode/.llama/checkpoints/Llama-2-7b-chat/tokenizer.model"):
         """
         Initializes the Tokenizer with a SentencePiece model.
 

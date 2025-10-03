@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional, List, Tuple
+from typing import Callable, Dict, List
 
 import torch
 from torch import Tensor
-import torch.nn.functional as F
 
 from torch.nn.functional import linear
 from safetensors import safe_open
@@ -82,7 +81,9 @@ def llama7BParams(path="/home/vscode/.llama/checkpoints/Llama-2-7b-chat/consolid
     n_heads = 32
     dim = 4096
 
+    print("Start loading weights")
     weight_dict = torch.load(path, map_location="cpu")
+    print("Done loading weights")
 
     return LlamaParams(
         embed=loadEmbedding(weight_dict, "tok_embeddings.weight"),
@@ -108,56 +109,6 @@ def llama7BParams(path="/home/vscode/.llama/checkpoints/Llama-2-7b-chat/consolid
                     weight_dict, f"layers.{layer_id}.feed_forward.w2.weight"),
                 up=loadLinear(
                     weight_dict, f"layers.{layer_id}.feed_forward.w3.weight"),
-            )
-            for layer_id in range(n_layers)],
-        head_dim=dim // n_heads,
-        n_heads=n_heads
-    )
-
-# grouped query attention
-# model.layers.0.self_attn.k_proj.weight torch.Size([256, 2048])
-# model.layers.0.self_attn.o_proj.weight torch.Size([2048, 2048])
-# model.layers.0.self_attn.q_proj.weight torch.Size([2048, 2048])
-# model.layers.0.self_attn.v_proj.weight torch.Size([256, 2048])
-#
-# https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0
-
-
-def llama1BParams(path="../TinyLlama-1.1B-Chat-v1.0/model.safetensors") -> LlamaParams:
-    n_layers = 22
-    n_heads = 32
-    n_kv_heads = 4
-    dim = 2048
-
-    weight_dict = {}
-    with safe_open(path, framework="pt", device="cpu") as f:
-        for key in f.keys():
-            weight_dict[key] = f.get_tensor(key)
-
-    return LlamaParams(
-        embed=loadEmbedding(weight_dict, "model.embed_tokens.weight"),
-        unembed_norm=loadNorm(weight_dict, "model.norm.weight"),
-        unembed=loadLinear(weight_dict, "lm_head.weight"),
-        layers=[
-            LlamaLayerParams(
-                attention_norm=loadNorm(
-                    weight_dict, f"model.layers.{layer_id}.input_layernorm.weight"),
-                key=loadLinearGroupHeads(
-                    weight_dict, n_kv_heads, n_heads, f"model.layers.{layer_id}.self_attn.k_proj.weight"),
-                value=loadLinearGroupHeads(
-                    weight_dict, n_kv_heads, n_heads, f"model.layers.{layer_id}.self_attn.v_proj.weight"),
-                query=loadLinearHeads(
-                    weight_dict, n_heads, f"model.layers.{layer_id}.self_attn.q_proj.weight"),
-                output=loadLinear(
-                    weight_dict, f"model.layers.{layer_id}.self_attn.o_proj.weight"),
-                process_norm=loadNorm(
-                    weight_dict, f"model.layers.{layer_id}.post_attention_layernorm.weight"),
-                gate=loadLinear(
-                    weight_dict, f"model.layers.{layer_id}.mlp.gate_proj.weight"),
-                down=loadLinear(
-                    weight_dict, f"model.layers.{layer_id}.mlp.down_proj.weight"),
-                up=loadLinear(
-                    weight_dict, f"model.layers.{layer_id}.mlp.up_proj.weight"),
             )
             for layer_id in range(n_layers)],
         head_dim=dim // n_heads,

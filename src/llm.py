@@ -59,8 +59,8 @@ class Score(Generic[Embedding, Query, Key]):
 def attend_to(inputs: List[Embedding],
               score: Callable[[Embedding, Embedding], float],
               value: Callable[[Embedding], Value]) -> Value:
-    result: Value = 0  # type: ignore
-    total_score = 0
+    result: Value = 0.0  # type: ignore
+    total_score = 0.0
     last_input = inputs[-1]
 
     for input in inputs:

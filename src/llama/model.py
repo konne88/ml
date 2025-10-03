@@ -3,7 +3,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional, List, Tuple
+from typing import Callable, List
 
 import torch
 from torch import Tensor
@@ -36,7 +36,25 @@ def sample_top_p(probs: torch.Tensor, p: float) -> torch.Tensor:
 @dataclass
 class Embedding:
     index: int
+    layer: int
     data: Tensor
+
+
+Cache = dict[int, dict[int, Tensor]]
+
+key_cache: Cache = {}
+value_cache: Cache = {}
+
+
+def cached(cache: Cache, layer: int, index: int, tensor: Callable[[], Tensor]):
+    return tensor()
+    # try:
+    #     return cache[layer][index]
+    # except:
+    #     return tensor()
+    # layer_cache = cache.get(layer, {})
+    # layer_cache[index] = tensor()
+    # cache[layer] = layer_cache
 
 
 def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_cis: Tensor) -> AttentionHead[Embedding, Tensor]:
@@ -48,10 +66,13 @@ def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_ci
         return apply_rotary_emb(current.index, params.query[head_index](params.attention_norm(current.data)))
 
     def key(other: Embedding) -> Tensor:
-        return apply_rotary_emb(other.index, params.key[head_index](params.attention_norm(other.data)))
+        return cached(key_cache, other.layer, other.index, lambda:
+                      apply_rotary_emb(other.index, params.key[head_index](
+                          params.attention_norm(other.data))))
 
     def value(other: Embedding) -> Tensor:
-        return params.value[head_index](params.attention_norm(other.data))
+        return cached(value_cache, other.layer, other.index, lambda:
+                      params.value[head_index](params.attention_norm(other.data)))
 
     def combine(query: Tensor, key: Tensor) -> float:
         return math.exp((torch.matmul(query, key).item() / math.sqrt(head_dim)))
@@ -66,13 +87,13 @@ def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_ci
     )
 
 
-def llamaLayer(params: LlamaLayerParams, n_heads: int, head_dim: int, freqs_cis: Tensor) -> Decoder[Embedding, Tensor]:
+def llamaLayer(layer_index: int, params: LlamaLayerParams, n_heads: int, head_dim: int, freqs_cis: Tensor) -> Decoder[Embedding, Tensor]:
     def process(current: Embedding, focused: List[Tensor]) -> Embedding:
         h = torch.stack(focused).flatten()
         h = current.data + params.output(h)
         n = params.process_norm(h)
         out = h + params.down(F.silu(params.gate(n)) * params.up(n))
-        return Embedding(index=current.index, data=out)
+        return Embedding(index=current.index, layer=layer_index+1, data=out)
 
     return Decoder(
         heads=[llamaHead(params, head_index, head_dim, freqs_cis)
@@ -85,7 +106,7 @@ def llama(params: LlamaParams, max_seq_len: int, temperature: float = 0.7, top_p
     freqs_cis = precompute_freqs_cis(params.head_dim, max_seq_len * 2)
 
     def embed(index: int, token: Token) -> Embedding:
-        return Embedding(index=index, data=params.embed(token))
+        return Embedding(index=index, layer=0, data=params.embed(token))
 
     def unembed(embedding: Embedding) -> Token:
         logits = params.unembed(params.unembed_norm(embedding.data))
@@ -95,6 +116,6 @@ def llama(params: LlamaParams, max_seq_len: int, temperature: float = 0.7, top_p
     return Transformer(
         embed=embed,
         unembed=unembed,
-        decoders=[llamaLayer(layer, params.n_heads, params.head_dim, freqs_cis)
-                  for layer in params.layers]
+        decoders=[llamaLayer(layer_index, layer, params.n_heads, params.head_dim, freqs_cis)
+                  for layer_index, layer in enumerate(params.layers)]
     )

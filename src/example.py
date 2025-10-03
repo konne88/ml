@@ -2,13 +2,12 @@
 from llm import autocomplete
 from llama.model import llama
 from llama.tokenizer import Tokenizer
-from llama.params import llama7BParams, llama1BParams
+from llama.params import llama7BParams
 import sys
 
 max_seq_len = 100
 
-tokenizer = Tokenizer(
-    model_path="/home/vscode/.llama/checkpoints/Llama-2-7b-chat/tokenizer.model")
+tokenizer = Tokenizer()
 transformer = llama(llama7BParams(), max_seq_len)
 prompt = sys.argv[1]
 
