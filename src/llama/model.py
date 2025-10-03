@@ -36,25 +36,27 @@ def sample_top_p(probs: torch.Tensor, p: float) -> torch.Tensor:
 @dataclass
 class Embedding:
     index: int
-    layer: int
+    layer_index: int
     data: Tensor
 
 
-Cache = dict[int, dict[int, Tensor]]
+Cache = dict[int, dict[int, dict[int, Tensor]]]
 
 key_cache: Cache = {}
 value_cache: Cache = {}
 
 
-def cached(cache: Cache, layer: int, index: int, tensor: Callable[[], Tensor]):
-    return tensor()
-    # try:
-    #     return cache[layer][index]
-    # except:
-    #     return tensor()
-    # layer_cache = cache.get(layer, {})
-    # layer_cache[index] = tensor()
-    # cache[layer] = layer_cache
+def cached(cache: Cache, input_index: int, layer_index: int, head_index: int, get_tensor: Callable[[], Tensor]):
+    try:
+        return cache[input_index][layer_index][head_index]
+    except KeyError:
+        tensor = get_tensor()
+        input_cache = cache.get(input_index, {})
+        layer_cache = input_cache.get(layer_index, {})
+        layer_cache[head_index] = tensor
+        input_cache[layer_index] = layer_cache
+        cache[input_index] = input_cache
+        return tensor
 
 
 def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_cis: Tensor) -> AttentionHead[Embedding, Tensor]:
@@ -66,12 +68,12 @@ def llamaHead(params: LlamaLayerParams, head_index: int, head_dim: int, freqs_ci
         return apply_rotary_emb(current.index, params.query[head_index](params.attention_norm(current.data)))
 
     def key(other: Embedding) -> Tensor:
-        return cached(key_cache, other.layer, other.index, lambda:
+        return cached(key_cache, other.index, other.layer_index, head_index, lambda:
                       apply_rotary_emb(other.index, params.key[head_index](
                           params.attention_norm(other.data))))
 
     def value(other: Embedding) -> Tensor:
-        return cached(value_cache, other.layer, other.index, lambda:
+        return cached(value_cache, other.index, other.layer_index, head_index, lambda:
                       params.value[head_index](params.attention_norm(other.data)))
 
     def combine(query: Tensor, key: Tensor) -> float:
@@ -93,7 +95,7 @@ def llamaLayer(layer_index: int, params: LlamaLayerParams, n_heads: int, head_di
         h = current.data + params.output(h)
         n = params.process_norm(h)
         out = h + params.down(F.silu(params.gate(n)) * params.up(n))
-        return Embedding(index=current.index, layer=layer_index+1, data=out)
+        return Embedding(index=current.index, layer_index=layer_index+1, data=out)
 
     return Decoder(
         heads=[llamaHead(params, head_index, head_dim, freqs_cis)
@@ -106,7 +108,7 @@ def llama(params: LlamaParams, max_seq_len: int, temperature: float = 0.7, top_p
     freqs_cis = precompute_freqs_cis(params.head_dim, max_seq_len * 2)
 
     def embed(index: int, token: Token) -> Embedding:
-        return Embedding(index=index, layer=0, data=params.embed(token))
+        return Embedding(index=index, layer_index=0, data=params.embed(token))
 
     def unembed(embedding: Embedding) -> Token:
         logits = params.unembed(params.unembed_norm(embedding.data))
