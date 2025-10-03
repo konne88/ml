@@ -4,11 +4,12 @@ from llama.model import llama
 from llama.tokenizer import Tokenizer
 from llama.params import llama7BParams
 import sys
+from kvcache import *
 
 max_seq_len = 100
 
 tokenizer = Tokenizer()
-transformer = llama(llama7BParams(), max_seq_len)
+transformer = kvcache(llama(llama7BParams(), max_seq_len))
 prompt = sys.argv[1]
 
 tokens = tokenizer.encode(prompt, bos=True, eos=False)
