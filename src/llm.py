@@ -1,46 +1,12 @@
 from typing import Protocol, TypeVar
 from dataclasses import dataclass
-from functools import partial
 from typing import Callable, Iterator, Generic, List, TypeVar
-from utils import prefixes
 
 Token = int
 Embedding = TypeVar('Embedding')
-Value = TypeVar('Value', bound="VectorSpace")
-
-
-class VectorSpace(Protocol):
-    def __add__(self: Value, other: Value) -> Value:
-        ...
-
-    def __mul__(self: Value, other: float) -> Value:
-        ...
-
-    def __truediv__(self: Value, other: float) -> Value:
-        ...
-
-
-@dataclass
-class AttentionHead(Generic[Embedding, Value]):
-    score: Callable[[Embedding, Embedding], float]
-    value: Callable[[Embedding], Value]
-
-
-@dataclass
-class Decoder(Generic[Embedding, Value]):
-    heads: List[AttentionHead[Embedding, Value]]
-    process: Callable[[Embedding, List[Value]], Embedding]
-
-
-@dataclass
-class Transformer(Generic[Embedding, Value]):
-    embed: Callable[[int, Token], Embedding]
-    decoders: List[Decoder[Embedding, Value]]
-    unembed: Callable[[Embedding], Token]
-
-
 Query = TypeVar('Query')
 Key = TypeVar('Key')
+Value = TypeVar('Value', bound="VectorSpace")
 
 
 class Score(Generic[Embedding, Query, Key]):
@@ -56,6 +22,36 @@ class Score(Generic[Embedding, Query, Key]):
         return self.combine(self.query(current), self.key(other))
 
 
+@dataclass
+class AttentionHead(Generic[Embedding, Query, Key, Value]):
+    score: Score[Embedding, Query, Key]
+    value: Callable[[Embedding], Value]
+
+
+@dataclass
+class Decoder(Generic[Embedding, Query, Key, Value]):
+    heads: List[AttentionHead[Embedding, Query, Key, Value]]
+    process: Callable[[Embedding, List[Value]], Embedding]
+
+
+@dataclass
+class Transformer(Generic[Embedding, Query, Key, Value]):
+    embed: Callable[[int, Token], Embedding]
+    decoders: List[Decoder[Embedding, Query, Key, Value]]
+    unembed: Callable[[Embedding], Token]
+
+
+class VectorSpace(Protocol):
+    def __add__(self: Value, other: Value) -> Value:
+        ...
+
+    def __mul__(self: Value, other: float) -> Value:
+        ...
+
+    def __truediv__(self: Value, other: float) -> Value:
+        ...
+
+
 def attend_to(inputs: List[Embedding],
               score: Callable[[Embedding, Embedding], float],
               value: Callable[[Embedding], Value]) -> Value:
@@ -69,26 +65,30 @@ def attend_to(inputs: List[Embedding],
     return result / total_score
 
 
-def decode(layer: Decoder[Embedding, Value], embeddings: List[Embedding]) -> Embedding:
-    current = embeddings[-1]
+def decode(layer: Decoder[Embedding, Query, Key, Value],
+           embeddings: List[Embedding]) -> Embedding:
     focused = [attend_to(embeddings, head.score, head.value)
-               for head in layer.heads]
+               for (_, head) in enumerate(layer.heads)]
+    current = embeddings[-1]
     return layer.process(current, focused)
 
 
-def transform(transformer: Transformer[Embedding, Value], tokens: List[Token]) -> Token:
-    embeddings = [transformer.embed(index, token)
-                  for (index, token) in enumerate(tokens)]
-    for layer in transformer.decoders:
-        embeddings = [decode(layer, prefix)
-                      for prefix in prefixes(embeddings)]
-    return transformer.unembed(embeddings[-1])
+def transform(transformer: Transformer[Embedding, Query, Key, Value], embeddings: List[List[Embedding]], token: Token) -> Token:
+    index = len(embeddings[0])
+    current = transformer.embed(index, token)
+    for layer_index, layer in enumerate(transformer.decoders):
+        embeddings[layer_index].append(current)
+        current = decode(layer, embeddings[layer_index])
+    return transformer.unembed(current)
 
 
-def autocomplete(transformer: Transformer[Embedding, Value], max_seq_len: int, tokens: List[Token]) -> Iterator[Token]:
-    yield from tokens
-    num_prompt_tokens = len(tokens)
-    for _ in range(max_seq_len - num_prompt_tokens):
-        next_token = transform(transformer, tokens)
-        tokens.append(next_token)
-        yield next_token
+def autocomplete(transformer: Transformer[Embedding, Query, Key, Value], max_seq_len: int, tokens: List[Token]) -> Iterator[Token]:
+    prompt_len = len(tokens)
+    embeddings: List[List[Embedding]] = [[] for _ in transformer.decoders]
+
+    for i in range(max_seq_len - 1):
+        token = tokens[i]
+        yield token
+        next_token = transform(transformer, embeddings, token)
+        if (i + 1 >= prompt_len):
+            tokens.append(next_token)
