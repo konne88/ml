@@ -1,3 +1,4 @@
+from typing import Protocol, TypeVar
 from dataclasses import dataclass
 from functools import partial
 from typing import Callable, Iterator, Generic, List, TypeVar
@@ -5,7 +6,18 @@ from utils import prefixes
 
 Token = int
 Embedding = TypeVar('Embedding')
-Value = TypeVar('Value')
+Value = TypeVar('Value', bound="VectorSpace")
+
+
+class VectorSpace(Protocol):
+    def __add__(self: Value, other: Value) -> Value:
+        ...
+
+    def __mul__(self: Value, other: float) -> Value:
+        ...
+
+    def __truediv__(self: Value, other: float) -> Value:
+        ...
 
 
 @dataclass
@@ -27,15 +39,32 @@ class Transformer(Generic[Embedding, Value]):
     unembed: Callable[[Embedding], Token]
 
 
+Query = TypeVar('Query')
+Key = TypeVar('Key')
+
+
+class Score(Generic[Embedding, Query, Key]):
+    def __init__(self,
+                 query: Callable[[Embedding], Query],
+                 key: Callable[[Embedding], Key],
+                 combine: Callable[[Query, Key], float]):
+        self.query = query
+        self.key = key
+        self.combine = combine
+
+    def __call__(self, current: Embedding, other: Embedding):
+        return self.combine(self.query(current), self.key(other))
+
+
 def attend_to(inputs: List[Embedding],
               score: Callable[[Embedding, Embedding], float],
               value: Callable[[Embedding], Value]) -> Value:
-    result = 0
+    result: Value = 0  # type: ignore
     total_score = 0
     last_input = inputs[-1]
 
     for input in inputs:
-        result += score(last_input, input) * value(input)
+        result += value(input) * score(last_input, input)
         total_score += score(last_input, input)
     return result / total_score
 
@@ -58,25 +87,8 @@ def transform(transformer: Transformer[Embedding, Value], tokens: List[Token]) -
 
 def autocomplete(transformer: Transformer[Embedding, Value], max_seq_len: int, tokens: List[Token]) -> Iterator[Token]:
     yield from tokens
-    n_prompt_tokens = len(tokens)
-    for _ in range(max_seq_len - n_prompt_tokens):
-        token = transform(transformer, tokens)
-        tokens.append(token)
-        yield token
-
-
-Query = TypeVar('Query')
-Key = TypeVar('Key')
-
-
-class Score(Generic[Embedding, Query, Key]):
-    def __init__(self,
-                 query: Callable[[Embedding], Query],
-                 key: Callable[[Embedding], Key],
-                 combine: Callable[[Query, Key], float]):
-        self.query = query
-        self.key = key
-        self.combine = combine
-
-    def __call__(self, current: Embedding, other: Embedding):
-        return self.combine(self.query(current), self.key(other))
+    num_prompt_tokens = len(tokens)
+    for _ in range(max_seq_len - num_prompt_tokens):
+        next_token = transform(transformer, tokens)
+        tokens.append(next_token)
+        yield next_token

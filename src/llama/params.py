@@ -26,6 +26,7 @@ def loadLinearHeads(weight_dict: WeightDict, n_heads: int, path: str) -> List[Ca
     weights = weights.t().view(dim, n_heads, -1)
     return [myLinear(weights[:, head_index, :].t()) for head_index in range(n_heads)]
 
+
 def loadLinearGroupHeads(weight_dict: WeightDict, n_groups: int, n_heads: int, path: str) -> List[Callable[[Tensor], Tensor]]:
     weights = weight_dict[path].float()
     (_, dim) = weights.shape
@@ -76,16 +77,12 @@ class LlamaParams:
     head_dim: int
 
 
-def llama7BParams(path = "/home/vscode/.llama/checkpoints/Llama-2-7b-chat/consolidated.00.pth") -> LlamaParams:
+def llama7BParams(path="/home/vscode/.llama/checkpoints/Llama-2-7b-chat/consolidated.00.pth") -> LlamaParams:
     n_layers = 32
     n_heads = 32
     dim = 4096
 
-    print ("About to load weights")
-
     weight_dict = torch.load(path, map_location="cpu")
-
-    print ("Loaded weights")
 
     return LlamaParams(
         embed=loadEmbedding(weight_dict, "tok_embeddings.weight"),
@@ -124,7 +121,9 @@ def llama7BParams(path = "/home/vscode/.llama/checkpoints/Llama-2-7b-chat/consol
 # model.layers.0.self_attn.v_proj.weight torch.Size([256, 2048])
 #
 # https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0
-def llama1BParams(path = "../TinyLlama-1.1B-Chat-v1.0/model.safetensors") -> LlamaParams:
+
+
+def llama1BParams(path="../TinyLlama-1.1B-Chat-v1.0/model.safetensors") -> LlamaParams:
     n_layers = 22
     n_heads = 32
     n_kv_heads = 4
