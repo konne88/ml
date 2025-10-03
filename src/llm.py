@@ -73,8 +73,7 @@ def decode(layer: Decoder[Embedding, Query, Key, Value],
     return layer.process(current, focused)
 
 
-def transform(transformer: Transformer[Embedding, Query, Key, Value], embeddings: List[List[Embedding]], token: Token) -> Token:
-    index = len(embeddings[0])
+def transform(transformer: Transformer[Embedding, Query, Key, Value], embeddings: List[List[Embedding]], index: int, token: Token) -> Token:
     current = transformer.embed(index, token)
     for layer_index, layer in enumerate(transformer.decoders):
         embeddings[layer_index].append(current)
@@ -89,6 +88,6 @@ def autocomplete(transformer: Transformer[Embedding, Query, Key, Value], max_seq
     for i in range(max_seq_len - 1):
         token = tokens[i]
         yield token
-        next_token = transform(transformer, embeddings, token)
+        next_token = transform(transformer, embeddings, i, token)
         if (i + 1 >= prompt_len):
             tokens.append(next_token)
